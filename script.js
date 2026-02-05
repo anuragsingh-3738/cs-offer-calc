@@ -1,6 +1,6 @@
  (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
 diff --git a/script.js b/script.js
-index 94c457b142e9cf32e2b3f59ccbbea41c2fafa764..df18f3ce430e6bf1ffb132591fbda26954e92532 100644
+index 94c457b142e9cf32e2b3f59ccbbea41c2fafa764..4ae2e4c3648b9d1c795396290045c09ba95f16a0 100644
 --- a/script.js
 +++ b/script.js
 @@ -1,78 +1,80 @@
@@ -89,7 +89,7 @@ index 94c457b142e9cf32e2b3f59ccbbea41c2fafa764..df18f3ce430e6bf1ffb132591fbda269
  function upiDiscount(orderValue, paymentMode) {
    if (paymentMode !== "UPI") return 0;
    if (orderValue >= 20000) return 500;
-@@ -170,175 +172,184 @@ function getSpecialDiscount() {
+@@ -170,175 +172,268 @@ function getSpecialDiscount() {
    const enabled = document.getElementById("specialEnable").checked;
    if (!enabled) return { name: "", amount: 0 };
  
@@ -118,6 +118,49 @@ index 94c457b142e9cf32e2b3f59ccbbea41c2fafa764..df18f3ce430e6bf1ffb132591fbda269
 -// Load Products from Google Sheet
 +// Load Products from Google Script Web App
  // ===============================
++function parseCsvLine(line) {
++  const vals = [];
++  let cur = "";
++  let quoted = false;
++
++  for (let i = 0; i < line.length; i += 1) {
++    const ch = line[i];
++
++    if (ch === '"') {
++      if (quoted && line[i + 1] === '"') {
++        cur += '"';
++        i += 1;
++      } else {
++        quoted = !quoted;
++      }
++      continue;
++    }
++
++    if (ch === "," && !quoted) {
++      vals.push(cur);
++      cur = "";
++      continue;
++    }
++
++    cur += ch;
++  }
++
++  vals.push(cur);
++  return vals;
++}
++
++function normalizeApiRows(data) {
++  if (!data) return [];
++  if (Array.isArray(data)) return data;
++
++  const keys = ["products", "data", "rows", "items", "result", "values"];
++  for (const key of keys) {
++    if (Array.isArray(data[key])) return data[key];
++  }
++
++  return [];
++}
++
 +function parseProductRow(row) {
 +  if (!row) return null;
 +
@@ -133,13 +176,23 @@ index 94c457b142e9cf32e2b3f59ccbbea41c2fafa764..df18f3ce430e6bf1ffb132591fbda269
 +    return "";
 +  };
 +
-+  const model = String(get(["model", "modelNumber", "Model Number", "A", "colA", "columnA"], 0))
++  const model = String(
++    get(["model", "modelNumber", "model_number", "Model Number", "A", "colA", "columnA"], 0)
++  )
 +    .replaceAll('"', "")
 +    .trim();
 +
-+  const mrp = Number(String(get(["mrp", "MRP", "H", "colH", "columnH"], 7)).replace(/[₹,\s]/g, "")) || 0;
++  const mrp =
++    Number(String(get(["mrp", "MRP", "price", "Price", "H", "colH", "columnH"], 7)).replace(/[₹,\s]/g, "")) || 0;
 +  const discountAmount =
-+    Number(String(get(["discountAmount", "Discount Amount", "Discount Amount (₹)", "M", "colM", "columnM"], 12)).replace(/[₹,\s]/g, "")) || 0;
++    Number(
++      String(
++        get(
++          ["discountAmount", "discount_amount", "Discount Amount", "Discount Amount (₹)", "M", "colM", "columnM"],
++          12
++        )
++      ).replace(/[₹,\s]/g, "")
++    ) || 0;
 +
 +  if (!model || mrp <= 0) return null;
 +
@@ -158,13 +211,42 @@ index 94c457b142e9cf32e2b3f59ccbbea41c2fafa764..df18f3ce430e6bf1ffb132591fbda269
    try {
 -    const res = await fetch(SHEET_CSV_URL);
 -    const text = await res.text();
-+    const res = await fetch(PRODUCT_DATA_API_URL);
-+    const data = await res.json();
-+    const rows = Array.isArray(data) ? data : Array.isArray(data?.products) ? data.products : [];
++    const res = await fetch(PRODUCT_DATA_API_URL, { cache: "no-store" });
++    const raw = await res.text();
++
++    let parsed;
++    try {
++      parsed = JSON.parse(raw);
++    } catch {
++      parsed = null;
++    }
++
++    let rows = normalizeApiRows(parsed);
++
++    // Fallback: CSV-style response
++    if (rows.length === 0 && raw.includes("\n")) {
++      const csvRows = raw
++        .trim()
++        .split(/\r?\n/)
++        .map((line) => parseCsvLine(line));
++
++      if (csvRows.length > 1) {
++        const header = csvRows[0].map((x) => (x || "").trim());
++        rows = csvRows.slice(1).map((r) => {
++          const obj = {};
++          header.forEach((h, i) => {
++            if (h) obj[h] = r[i] ?? "";
++          });
++          return Object.keys(obj).length ? obj : r;
++        });
++      }
++    }
  
 -    const rows = text.trim().split("\n").map((r) => r.split(","));
 -    rows.shift();
--
++    PRODUCT_MASTER = rows.map(parseProductRow).filter(Boolean);
++    PRODUCT_CACHE = new Map(PRODUCT_MASTER.map((p) => [p.model.toUpperCase(), p]));
+ 
 -    PRODUCT_MASTER = rows
 -      .map((cols) => {
 -        const model = (cols[0] || "").replaceAll('"', "").trim();
@@ -172,8 +254,9 @@ index 94c457b142e9cf32e2b3f59ccbbea41c2fafa764..df18f3ce430e6bf1ffb132591fbda269
 -        return { model, price };
 -      })
 -      .filter((p) => p.model && p.price > 0);
-+    PRODUCT_MASTER = rows.map(parseProductRow).filter(Boolean);
-+    PRODUCT_CACHE = new Map(PRODUCT_MASTER.map((p) => [p.model.toUpperCase(), p]));
++    if (PRODUCT_MASTER.length === 0) {
++      throw new Error("No valid products found in API response.");
++    }
  
      console.log("✅ Products loaded:", PRODUCT_MASTER.length);
    } catch (err) {
@@ -310,7 +393,7 @@ index 94c457b142e9cf32e2b3f59ccbbea41c2fafa764..df18f3ce430e6bf1ffb132591fbda269
          if (already >= 2) {
            e.target.checked = false;
            alert("Combo Discount allows only 2 products selection.");
-@@ -349,57 +360,66 @@ function renderCart() {
+@@ -349,57 +444,66 @@ function renderCart() {
        cart[idx].comboSelected = e.target.checked;
        refreshSummary();
      });
