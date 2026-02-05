@@ -1,193 +1,156 @@
-/* =========================
-   CONFIG
-========================= */
 const GOOGLE_API_URL =
   "https://script.google.com/macros/s/AKfycbxFCHjVhhGmOMTUgMvjT2Hz6I0z2vhSKrLLhNzR9qX652jT8ZVteIw4Wa3FQP-vgIea/exec";
 
-/* =========================
-   STATE
-========================= */
 let cart = [];
 let productCache = [];
+let offerCreatedAt = null;
 
-/* =========================
-   INIT – LOAD ALL PRODUCTS
-========================= */
+/* ---------------- LOAD PRODUCTS ---------------- */
 fetch(GOOGLE_API_URL)
-  .then(res => res.json())
-  .then(data => {
-    if (Array.isArray(data)) {
-      productCache = data;
-    }
-  })
-  .catch(err => console.error("Failed to load product list", err));
+  .then(r => r.json())
+  .then(d => productCache = d);
 
-/* =========================
-   AUTO SUGGESTION
-========================= */
-const modelInput = document.getElementById("modelInput");
-const suggestionBox = document.getElementById("suggestions");
-
-modelInput.addEventListener("input", () => {
-  const query = modelInput.value.trim().toLowerCase();
-  suggestionBox.innerHTML = "";
-  suggestionBox.style.display = "none";
-
-  if (!query || query.length < 2) return;
-
-  const matches = productCache
-    .filter(p => p.model.toLowerCase().includes(query))
-    .slice(0, 8);
-
-  if (matches.length === 0) return;
-
-  matches.forEach(p => {
-    const div = document.createElement("div");
-    div.className = "suggItem";
-    div.innerHTML = `<b>${p.model}</b> — ₹${p.mrp}`;
-    div.onclick = () => {
-      modelInput.value = p.model;
-      suggestionBox.style.display = "none";
-    };
-    suggestionBox.appendChild(div);
-  });
-
-  suggestionBox.style.display = "block";
-});
-
-document.addEventListener("click", e => {
-  if (!modelInput.contains(e.target)) {
-    suggestionBox.style.display = "none";
-  }
-});
-
-/* =========================
-   ADD PRODUCT BY MODEL
-========================= */
+/* ---------------- ADD PRODUCT ---------------- */
 async function addProduct() {
   const model = modelInput.value.trim();
-  if (!model) {
-    alert("Enter product model number");
-    return;
-  }
+  if (!model) return alert("Enter model number");
 
-  // prevent duplicate
   if (cart.some(p => p.model === model)) {
     alert("Product already added");
     return;
   }
 
-  try {
-    const res = await fetch(`${GOOGLE_API_URL}?model=${encodeURIComponent(model)}`);
-    const product = await res.json();
+  const res = await fetch(`${GOOGLE_API_URL}?model=${encodeURIComponent(model)}`);
+  const p = await res.json();
 
-    if (!product || !product.model) {
-      alert("Product not found in Google Sheet");
-      return;
-    }
+  if (!p.model) return alert("Product not found");
 
-    cart.push({
-      model: product.model,
-      mrp: product.mrp,
-      sheetDiscount: product.discountAmount,
-      sheetDiscountPercent: product.discountPercent,
-      qty: 1
-    });
-
-    modelInput.value = "";
-    suggestionBox.style.display = "none";
-    renderCart();
-  } catch (err) {
-    console.error(err);
-    alert("Failed to fetch product");
-  }
-}
-
-/* =========================
-   DISCOUNT SLAB LOGIC
-========================= */
-function getSlabDiscount(total) {
-  if (total >= 20000) return { web: 1000, upi: 500 };
-  if (total >= 15000) return { web: 700, upi: 300 };
-  if (total >= 13000) return { web: 500, upi: 300 };
-  if (total >= 10000) return { web: 500, upi: 200 };
-  if (total >= 5000) return { web: 200, upi: 100 };
-  return { web: 0, upi: 0 };
-}
-
-/* =========================
-   RENDER CART
-========================= */
-function renderCart() {
-  const cartBody = document.getElementById("cartBody");
-  cartBody.innerHTML = "";
-
-  let orderValue = cart.reduce((s, p) => s + p.mrp * p.qty, 0);
-  let sheetDiscountTotal = cart.reduce((s, p) => s + p.sheetDiscount * p.qty, 0);
-
-  const slab = getSlabDiscount(orderValue);
-  const paymentMode = document.getElementById("paymentMode").value;
-  const upiDiscount = paymentMode === "UPI" ? slab.upi : 0;
-
-  const comboEnable = document.getElementById("comboEnable").checked;
-  let comboDiscount = 0;
-  if (comboEnable && cart.length === 2 && cart.every(p => p.mrp >= 5000)) {
-    comboDiscount = Math.round(orderValue * 0.03);
-  }
-
-  const specialEnable = document.getElementById("specialEnable").checked;
-  const specialAmt = specialEnable
-    ? Number(document.getElementById("specialAmt").value || 0)
-    : 0;
-
-  const totalSavings =
-    sheetDiscountTotal +
-    slab.web +
-    upiDiscount +
-    comboDiscount +
-    specialAmt;
-
-  const finalPayable = Math.max(orderValue - totalSavings, 0);
-
-  cart.forEach((p, i) => {
-    const row = document.createElement("tr");
-
-    const itemShare =
-      orderValue > 0
-        ? Math.round((p.mrp * p.qty / orderValue) * finalPayable)
-        : 0;
-
-    row.innerHTML = `
-      <td>${p.model}</td>
-      <td>₹${p.mrp}</td>
-      <td>${p.sheetDiscountPercent}% (₹${p.sheetDiscount})</td>
-      <td>
-        <input type="number" min="1" value="${p.qty}"
-          onchange="cart[${i}].qty=this.value; renderCart()"
-          style="width:60px">
-      </td>
-      <td>₹${itemShare}</td>
-      <td>
-        <button onclick="cart.splice(${i},1); renderCart()">❌</button>
-      </td>
-    `;
-    cartBody.appendChild(row);
+  cart.push({
+    model: p.model,
+    mrp: p.mrp,
+    sheetDiscount: p.discountAmount,
+    offerBase: p.offerPrice, // ✅ base for all discounts
+    discountPercent: Math.round(p.discountPercent),
+    qty: 1,
+    comboSelected: false
   });
 
-  // summary
-  document.getElementById("orderValue").innerText = "₹" + orderValue;
-  document.getElementById("webDisc").innerText = "₹" + slab.web;
-  document.getElementById("upiDisc").innerText = "₹" + upiDiscount;
-  document.getElementById("comboDisc").innerText = "₹" + comboDiscount;
-  document.getElementById("specialDisc").innerText = "₹" + specialAmt;
-  document.getElementById("totalSavings").innerText = "₹" + totalSavings;
-  document.getElementById("finalPay").innerText = "₹" + finalPayable;
+  modelInput.value = "";
+  renderCart();
 }
 
-/* =========================
-   CLEAR
-========================= */
-function clearCart() {
-  cart = [];
-  renderCart();
+/* ---------------- DISCOUNT SLAB ---------------- */
+function slabDiscount(total) {
+  if (total >= 20000) return 1000;
+  if (total >= 15000) return 700;
+  if (total >= 13000) return 500;
+  if (total >= 10000) return 500;
+  if (total >= 5000) return 200;
+  return 0;
+}
+
+/* ---------------- RENDER CART ---------------- */
+function renderCart() {
+  cartBody.innerHTML = "";
+
+  let offerBaseTotal = cart.reduce((s, p) => s + p.offerBase * p.qty, 0);
+
+  let webDisc = slabDiscount(offerBaseTotal);
+  let upiDisc = paymentMode.value === "UPI" ? Math.round(webDisc * 0.5) : 0;
+
+  // Combo logic
+  const comboItems = cart.filter(p => p.comboSelected && p.offerBase >= 5000);
+  let comboDisc = 0;
+  if (comboItems.length === 2) {
+    comboDisc = Math.round(
+      comboItems.reduce((s, p) => s + p.offerBase * 0.03, 0)
+    );
+  }
+
+  let specialDisc = specialEnable.checked
+    ? Number(specialAmt.value || 0)
+    : 0;
+
+  const totalDiscount = webDisc + upiDisc + comboDisc + specialDisc;
+  const finalPay = Math.max(offerBaseTotal - totalDiscount, 0);
+
+  cart.forEach((p, i) => {
+    cartBody.innerHTML += `
+      <tr>
+        <td>
+          <input type="checkbox"
+            ${p.comboSelected ? "checked" : ""}
+            onchange="cart[${i}].comboSelected=this.checked;renderCart()">
+        </td>
+        <td>${p.model}</td>
+        <td>₹${p.mrp}</td>
+        <td>${p.discountPercent}% (₹${p.sheetDiscount})</td>
+        <td>
+          <input type="number" value="${p.qty}" min="1"
+            onchange="cart[${i}].qty=this.value;renderCart()"
+            style="width:60px">
+        </td>
+        <td>₹${p.offerBase}</td>
+      </tr>
+    `;
+  });
+
+  orderValue.innerText = "₹" + offerBaseTotal;
+
+  toggleRow(webDiscRow, webDisc);
+  toggleRow(upiDiscRow, upiDisc);
+  toggleRow(comboDiscRow, comboDisc);
+  toggleRow(specialDiscRow, specialDisc);
+
+  webDiscEl.innerText = "₹" + webDisc;
+  upiDiscEl.innerText = "₹" + upiDisc;
+  comboDiscEl.innerText = "₹" + comboDisc;
+  specialDiscEl.innerText = "₹" + specialDisc;
+
+  totalSavings.innerText = "₹" + totalDiscount;
+  finalPayEl.innerText = "₹" + finalPay;
+}
+
+/* ---------------- HELPERS ---------------- */
+function toggleRow(row, value) {
+  row.style.display = value > 0 ? "flex" : "none";
+}
+
+/* ---------------- CREATE OFFER ---------------- */
+function createOffer() {
+  offerCreatedAt = Date.now();
+  offerId.innerText =
+    "HH-OFF-" +
+    new Date().toISOString().slice(0,10).replace(/-/g,"") +
+    "-" +
+    Math.floor(1000 + Math.random() * 9000);
+
+  startTimer();
+  takeScreenshot();
+}
+
+/* ---------------- TIMER ---------------- */
+function startTimer() {
+  setInterval(() => {
+    const diff = 24*60*60*1000 - (Date.now() - offerCreatedAt);
+    if (diff <= 0) {
+      validity.innerText = "Offer Expired";
+      return;
+    }
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    validity.innerText = `Valid for ${h}h ${m}m`;
+  }, 1000);
+}
+
+/* ---------------- SCREENSHOT ---------------- */
+function takeScreenshot() {
+  html2canvas(document.getElementById("offerSlip")).then(canvas => {
+    canvas.toBlob(blob => {
+      navigator.clipboard.write([
+        new ClipboardItem({ "image/png": blob })
+      ]);
+      alert("Offer screenshot copied");
+    });
+  });
 }
