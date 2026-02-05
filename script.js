@@ -1,9 +1,8 @@
- (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
 diff --git a/script.js b/script.js
-index 77cec975484045e1242fd7db02c8f0d8eca3019b..0bd4093946b074a06fcc5d7b459edbfc4016c903 100644
+index 77cec975484045e1242fd7db02c8f0d8eca3019b..91b461507dd315e586ab22add5f1551bd412855b 100644
 --- a/script.js
 +++ b/script.js
-@@ -1,467 +1,733 @@
+@@ -1,467 +1,853 @@
 - (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
 -diff --git a/script.js b/script.js
 -index 94c457b142e9cf32e2b3f59ccbbea41c2fafa764..4ae2e4c3648b9d1c795396290045c09ba95f16a0 100644
@@ -477,6 +476,9 @@ index 77cec975484045e1242fd7db02c8f0d8eca3019b..0bd4093946b074a06fcc5d7b459edbfc
 +const GOOGLE_SAVE_API_URL =
 +  "https://script.google.com/macros/s/AKfycbze3uf5PIZjlyx1h1g7D8iRrFLrdhJjODCDGNWYTmX51LNr5b0YQgO--VEe9jaQbUQ/exec";
 +
++const PRODUCT_DATA_API_URL =
++  "https://script.google.com/macros/s/AKfycbxFCHjVhhGmOMTUgMvjT2Hz6I0z2vhSKrLLhNzR9qX652jT8ZVteIw4Wa3FQP-vgIea/exec";
++
 +let PRODUCT_MASTER = [];
 +let cart = [];
 +
@@ -656,25 +658,142 @@ index 77cec975484045e1242fd7db02c8f0d8eca3019b..0bd4093946b074a06fcc5d7b459edbfc
 +// ===============================
 +// Load Products from Google Sheet
 +// ===============================
++function parseCsvLine(line) {
++  const values = [];
++  let current = "";
++  let inQuotes = false;
++
++  for (let i = 0; i < line.length; i += 1) {
++    const ch = line[i];
++
++    if (ch === '"') {
++      if (inQuotes && line[i + 1] === '"') {
++        current += '"';
++        i += 1;
++      } else {
++        inQuotes = !inQuotes;
++      }
++      continue;
++    }
++
++    if (ch === "," && !inQuotes) {
++      values.push(current);
++      current = "";
++      continue;
++    }
++
++    current += ch;
++  }
++
++  values.push(current);
++  return values;
++}
++
++function cleanNumber(value) {
++  const n = Number(String(value || "").replace(/[₹,\s]/g, ""));
++  return Number.isFinite(n) ? n : 0;
++}
++
++function normalizeProductRows(raw) {
++  if (!raw) return [];
++
++  if (Array.isArray(raw)) return raw;
++
++  const candidates = ["products", "data", "rows", "items", "result", "values"];
++  for (const key of candidates) {
++    if (Array.isArray(raw[key])) return raw[key];
++  }
++
++  return [];
++}
++
++function parseProductRow(row, headerMap) {
++  const getByHeader = (...keys) => {
++    for (const key of keys) {
++      const idx = headerMap[key];
++      if (idx !== undefined && row[idx] !== undefined) return row[idx];
++    }
++    return "";
++  };
++
++  const model = String(
++    getByHeader("model", "model no", "model number", "model_number", "modelno") || row[0] || ""
++  )
++    .replaceAll('"', "")
++    .trim();
++
++  const price = cleanNumber(
++    getByHeader("mrp", "price", "selling price", "offer price", "h") || row[1] || row[7] || "0"
++  );
++
++  if (!model || price <= 0) return null;
++  return { model, price };
++}
++
++function hydrateProductCache(products) {
++  PRODUCT_MASTER = products;
++  console.log("✅ Products loaded:", PRODUCT_MASTER.length);
++}
++
 +async function loadProductsFromSheet() {
 +  try {
-+    const res = await fetch(SHEET_CSV_URL);
++    const apiRes = await fetch(PRODUCT_DATA_API_URL, { cache: "no-store" });
++    if (apiRes.ok) {
++      const raw = await apiRes.text();
++      try {
++        const parsed = JSON.parse(raw);
++        const rows = normalizeProductRows(parsed)
++          .map((r) => {
++            if (Array.isArray(r)) return r;
++            if (r && typeof r === "object") {
++              return [r.model || r.modelNumber || r.model_number || "", r.price || r.mrp || 0];
++            }
++            return null;
++          })
++          .filter(Boolean)
++          .map((cols) => ({
++            model: String(cols[0] || "").replaceAll('"', "").trim(),
++            price: cleanNumber(cols[1]),
++          }))
++          .filter((p) => p.model && p.price > 0);
++
++        if (rows.length > 0) {
++          hydrateProductCache(rows);
++          return;
++        }
++      } catch {
++        // fallback to CSV source below
++      }
++    }
++
++    const res = await fetch(SHEET_CSV_URL, { cache: "no-store" });
 +    const text = await res.text();
++    const csvRows = text
++      .split(/\r?\n/)
++      .map((line) => line.trim())
++      .filter(Boolean)
++      .map(parseCsvLine);
 +
-+    const rows = text.trim().split("\n").map((r) => r.split(","));
-+    rows.shift();
++    if (csvRows.length === 0) throw new Error("CSV returned no rows");
 +
-+    PRODUCT_MASTER = rows
-+      .map((cols) => {
-+        const model = (cols[0] || "").replaceAll('"', "").trim();
-+        const price = Number((cols[1] || "0").replaceAll('"', "").trim());
-+        return { model, price };
-+      })
-+      .filter((p) => p.model && p.price > 0);
++    const headers = csvRows[0].map((h) => String(h || "").trim().toLowerCase());
++    const headerMap = {};
++    headers.forEach((h, idx) => {
++      if (h) headerMap[h] = idx;
++    });
 +
-+    console.log("✅ Products loaded:", PRODUCT_MASTER.length);
++    const products = csvRows
++      .slice(1)
++      .map((row) => parseProductRow(row, headerMap))
++      .filter(Boolean);
++
++    if (products.length === 0) {
++      throw new Error("No products parsed from CSV. Check sheet columns/header names.");
++    }
++
++    hydrateProductCache(products);
 +  } catch (err) {
-+    alert("❌ Unable to load products from Google Sheet.");
++    alert("❌ Unable to load products. Please check product API/Sheet access.");
 +    console.error(err);
 +  }
 +}
@@ -1204,6 +1323,3 @@ index 77cec975484045e1242fd7db02c8f0d8eca3019b..0bd4093946b074a06fcc5d7b459edbfc
 +  renderCart();
 +  refreshSlipHeader();
 +})();
- 
-EOF
-)
