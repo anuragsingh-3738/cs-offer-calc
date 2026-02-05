@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>HunyHuny Discount Offer</title>
+
+  <!-- Screenshot library -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #f5f6fa; }
+    .container { max-width: 980px; margin: 18px auto; padding: 14px; }
+    .card { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 3px 10px rgba(0,0,0,0.08); }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 14px; }
+    .field label { display: block; font-size: 12px; color: #333; margin-bottom: 6px; font-weight: 700; }
+    .field input, .field select {
+      width: 100%; padding: 10px; border-radius: 10px;
+      border: 1px solid #ddd; outline: none; font-size: 14px;
+      background: #fff;
+    }
+
+    .btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    button {
+      border: 0; padding: 10px 12px; border-radius: 10px;
+      font-weight: 700; cursor: pointer; font-size: 14px;
+    }
+    .btn-primary { background: #2f6fed; color: #fff; }
+    .btn-secondary { background: #eef2ff; color: #1e40af; }
+    .btn-danger { background: #ffe4e6; color: #9f1239; }
+    .btn-dark { background: #111827; color: #fff; }
+    .btn-success { background: #16a34a; color: #fff; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; overflow: hidden; }
+    th, td { border-bottom: 1px solid #eee; padding: 10px; font-size: 13px; text-align: left; }
+    th { background: #fafafa; font-weight: 800; }
+    .qty { width: 70px; }
+
+    .pill { padding: 6px 10px; border-radius: 999px; font-weight: 800; font-size: 12px; display: inline-block; }
+    .pill-upi { background: #dcfce7; color: #166534; }
+    .pill-net { background: #fee2e2; color: #991b1b; }
+
+    .summary {
+      margin-top: 14px;
+      border: 1px dashed #ddd;
+      padding: 12px;
+      border-radius: 12px;
+      background: #fcfcff;
+    }
+    .row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
+    .row b { font-weight: 900; }
+
+    .note { margin-top: 12px; font-size: 12px; color: #444; text-align: center; font-weight: 800; }
+    .expire { margin-top: 6px; text-align: center; color: #7c3aed; font-weight: 900; }
+
+    .offer-box { margin-top: 12px; padding: 12px; border-radius: 12px; background: #fff7ed; border: 1px solid #fed7aa; }
+    .offer-box h3 { margin: 0 0 10px; font-size: 14px; }
+    .offer-inline { display: grid; grid-template-columns: 1fr 200px; gap: 10px; }
+    .hint { font-size: 11px; color: #555; margin-top: 6px; }
+
+    .comboMsg{
+      margin-top:10px;
+      padding:10px;
+      border-radius:12px;
+      background:#ecfeff;
+      border:1px solid #a5f3fc;
+      color:#0f172a;
+      font-weight:800;
+      font-size:12px;
+      display:none;
+    }
+
+    /* Suggestions dropdown */
+    #suggestions {
+      position: relative;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      margin-top: 6px;
+      display: none;
+      max-height: 180px;
+      overflow: auto;
+      z-index: 999;
+    }
+    .suggItem {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .suggItem:hover { background: #f3f4f6; }
+
+    /* Screenshot Card */
+    #slipContent {
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
+    }
+
+    .slipHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #f1f5f9;
+      margin-bottom: 12px;
+    }
+
+    .slipBrand { display: flex; align-items: center; gap: 10px; }
+
+    .logo{
+      width: 110px;
+      height: 70px;
+      border-radius: 12px;
+      object-fit: contain;
+      background: #ffffff;
+      border: 1px solid #eee;
+      padding: 6px;
+    }
+
+    .brandText h2{ margin: 0; font-size: 16px; font-weight: 900; }
+    .brandText p{ margin: 4px 0 0; font-size: 12px; color: #666; font-weight: 700; }
+
+    .offerIdBox{
+      padding: 10px 12px;
+      background: #0f172a;
+      color: white;
+      border-radius: 12px;
+      font-weight: 900;
+      font-size: 13px;
+      text-align: right;
+      min-width: 220px;
+    }
+
+    .detailsGrid{
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+      margin-bottom: 10px;
+    }
+
+    .infoCard{
+      background: #f8fafc;
+      border: 1px solid #eef2f7;
+      border-radius: 12px;
+      padding: 10px;
+      font-size: 13px;
+    }
+    .infoCard span{
+      display:block;
+      color:#666;
+      font-size: 11px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+    .infoCard b{
+      font-size: 13px;
+      font-weight: 900;
+      color:#111827;
+    }
+
+    .hide { display: none !important; }
+
+    /* ✅ Discount colors */
+    .webDiscColor { color: #1d4ed8; font-weight: 1000; }
+    .upiDiscColor { color: #6d28d9; font-weight: 1000; }
+    .comboDiscColor { color: #ea580c; font-weight: 1000; }
+    .specialDiscColor { color: #be185d; font-weight: 1000; }
+
+    /* ✅ Total savings badge */
+    .savings-pay {
+      font-size: 20px;
+      font-weight: 1000;
+      color: #166534;
+      background: #dcfce7;
+      padding: 8px 12px;
+      border-radius: 14px;
+      display: inline-block;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    }
+
+    /* ✅ Final payable highlight */
+    .final-pay {
+      font-size: 26px !important;
+      font-weight: 1000 !important;
+      color: #ffffff !important;
+      background: linear-gradient(135deg, #0f172a, #111827);
+      padding: 14px 16px;
+      border-radius: 16px;
+      display: inline-block;
+      letter-spacing: 0.6px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.22);
+      border: 2px solid rgba(255,255,255,0.15);
+    }
+
+    @keyframes pulseGlow {
+      0% { transform: scale(1); box-shadow: 0 10px 20px rgba(0,0,0,0.22); }
+      50% { transform: scale(1.02); box-shadow: 0 14px 28px rgba(0,0,0,0.26); }
+      100% { transform: scale(1); box-shadow: 0 10px 20px rgba(0,0,0,0.22); }
+    }
+
+    .final-pay-animate {
+      animation: pulseGlow 1.4s ease-in-out infinite;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="card">
+
+      <!-- Inputs -->
+      <div class="grid">
+        <div class="field">
+          <label>Sales Person Name</label>
+          <input id="salesPerson" placeholder="Enter sales person name"/>
+        </div>
+
+        <div class="field">
+          <label>Customer Name</label>
+          <input id="customerName" placeholder="Enter customer name"/>
+        </div>
+
+        <div class="field">
+          <label>Customer Mobile Number</label>
+          <input id="customerMobile" placeholder="10-digit mobile" maxlength="10"/>
+        </div>
+
+        <div class="field">
+          <label>Payment Mode</label>
+          <select id="paymentMode">
+            <option value="UPI">UPI</option>
+            <option value="NET">Net Banking</option>
+          </select>
+          <div class="hint" id="paymentHint"></div>
+        </div>
+
+        <div class="field">
+          <label>Search Product by Model Number</label>
+          <input id="modelSearch" placeholder="Type model no. (e.g. HH102)"/>
+          <div id="suggestions"></div>
+          <div class="hint">Suggestions load from Google Sheet (Model No + Price).</div>
+        </div>
+
+        <div class="field">
+          <label>&nbsp;</label>
+          <button class="btn-primary" id="addProductBtn">+ Add Product</button>
+        </div>
+      </div>
+
+      <!-- Special Discount -->
+      <div class="offer-box">
+        <h3>Special Discount Offer (Optional)</h3>
+
+        <div class="field" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <input type="checkbox" id="specialEnable" style="width:18px;height:18px;">
+          <label style="margin:0;font-weight:900;">Apply Special Discount Offer</label>
+        </div>
+
+        <div class="offer-inline">
+          <div class="field">
+            <label>Offer Name</label>
+            <input id="specialName" placeholder="e.g. Festival Offer" disabled />
+          </div>
+
+          <div class="field">
+            <label>Offer Amount (₹100 - ₹1500)</label>
+            <input id="specialAmt" type="number" min="100" max="1500" placeholder="0" disabled />
+          </div>
+        </div>
+      </div>
+
+      <!-- Combo Discount -->
+      <div class="offer-box">
+        <h3>Combo Discount (3%) (Optional)</h3>
+
+        <div class="field" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <input type="checkbox" id="comboEnable" style="width:18px;height:18px;">
+          <label style="margin:0;font-weight:900;">
+            Apply 3% Combo Discount (Select exactly 2 products, each ₹5000+)
+          </label>
+        </div>
+
+        <div class="comboMsg" id="comboMessageBox"></div>
+      </div>
+
+      <!-- SCREENSHOT AREA -->
+      <div id="slipContent">
+
+        <div class="slipHeader">
+          <div class="slipBrand">
+            <img class="logo" src="logo.png" alt="Logo" />
+            <div class="brandText">
+              <h2>HunyHuny Overseas Pvt. Ltd.</h2>
+              <p>Discount Offer (WhatsApp Friendly)</p>
+            </div>
+          </div>
+
+          <div class="offerIdBox">
+            Offer ID: <span id="offerIdText">Not Created</span>
+            <div style="font-size:11px; margin-top:4px; opacity:0.85;">
+              Status: <span id="offerStatusText">Not Created</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detailsGrid">
+          <div class="infoCard">
+            <span>Customer Name</span>
+            <b id="slipCustomerName">-</b>
+          </div>
+          <div class="infoCard">
+            <span>Mobile No</span>
+            <b id="slipCustomerMobile">-</b>
+          </div>
+          <div class="infoCard">
+            <span>Sales Person</span>
+            <b id="slipSalesPerson">-</b>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th id="comboTh" class="hide">Combo</th>
+              <th>Model No</th>
+              <th>Price</th>
+              <th>Qty</th>
+              <th>Total</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="cartBody"></tbody>
+        </table>
+
+        <div class="summary">
+          <div class="row"><span>Order Value</span><b id="orderValue">₹0</b></div>
+
+          <div id="breakdownBox">
+            <div class="row"><span>Website Discount</span><b id="webDisc" class="webDiscColor">₹0</b></div>
+            <div class="row"><span>UPI Discount</span><b id="upiDisc" class="upiDiscColor">₹0</b></div>
+
+            <div class="row hide" id="comboRow">
+              <span>Combo Discount (3%)</span>
+              <b id="comboDisc" class="comboDiscColor">₹0</b>
+            </div>
+
+            <div class="row hide" id="specialRow">
+              <span id="specialLabel">Special Discount</span>
+              <b id="specialDisc" class="specialDiscColor">₹0</b>
+            </div>
+          </div>
+
+          <div class="row"><span>Total Savings</span><b id="totalSavings" class="savings-pay">₹0</b></div>
+
+          <hr style="border:none;border-top:1px solid #eee;margin:10px 0;">
+
+          <div class="row" style="font-size:16px;">
+            <span>Final Payable</span>
+            <b id="finalPay" class="final-pay final-pay-animate">₹0</b>
+          </div>
+
+          <div class="expire" id="expireText"></div>
+          <div class="note">This offer is valid for 24 hours only.</div>
+        </div>
+
+      </div>
+
+      <div class="btns">
+        <button class="btn-success" id="createOfferBtn">✅ Create Offer</button>
+        <button class="btn-secondary" id="toggleBreakdownBtn">👁️ Hide Breakdown</button>
+        <button class="btn-dark" id="screenshotBtn">📸 Copy Screenshot</button>
+        <button class="btn-secondary" id="copyBtn">🧾 Copy Offer Summary</button>
+        <button class="btn-primary" id="whatsappBtn">📲 WhatsApp Share</button>
+        <button class="btn-secondary" id="clearCartBtn">🧹 Clear Cart Only</button>
+        <button class="btn-danger" id="clearAllBtn">🧨 Clear All</button>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
