@@ -42,8 +42,19 @@ function cleanMobile(m) {
   return (m || "").replace(/\D/g, "").trim();
 }
 
+function getItemDiscountPct(item) {
+  const pct = Number(item.discountPct || 0);
+  return Math.min(Math.max(pct, 0), 100);
+}
+
+function getItemOfferPrice(item) {
+  const mrp = Number(item.price || 0);
+  const pct = getItemDiscountPct(item);
+  return Math.round(mrp * (1 - pct / 100));
+}
+
 function getItemTotal(item) {
-  return Number(item.price || 0) * Number(item.qty || 0);
+  return getItemOfferPrice(item) * Number(item.qty || 0);
 }
 
 function getCartTotal() {
@@ -122,7 +133,7 @@ function updateComboMessage() {
   }
 
   if (eligible.length < 2) {
-    box.innerText = "⚠️ Combo needs 2 products with total value ₹5000+ each (Price × Qty).";
+    box.innerText = "⚠️ Combo needs 2 products with total value ₹5000+ each (Offer Price × Qty).";
     return;
   }
 
@@ -275,6 +286,11 @@ function renderCart() {
       <td><b>${item.model}</b></td>
       <td>${formatINR(item.price)}</td>
       <td>
+        <input class="disc" type="number" min="0" max="100" step="0.01" value="${getItemDiscountPct(item)}" data-index="${index}" />%
+        <div style="font-size:11px;color:#6b7280;">${formatINR(item.price - getItemOfferPrice(item))}</div>
+      </td>
+      <td><b>${formatINR(getItemOfferPrice(item))}</b></td>
+      <td>
         <input class="qty" type="number" min="1" value="${item.qty}" data-index="${index}" />
       </td>
       <td><b>${formatINR(total)}</b></td>
@@ -282,6 +298,23 @@ function renderCart() {
     `;
 
     tbody.appendChild(tr);
+  });
+
+  document.querySelectorAll(".disc").forEach((inp) => {
+    inp.addEventListener("input", (e) => {
+      const idx = Number(e.target.dataset.index);
+      let d = Number(e.target.value || 0);
+      if (d < 0) d = 0;
+      if (d > 100) d = 100;
+
+      cart[idx].discountPct = d;
+
+      const total = getItemTotal(cart[idx]);
+      if (total < 5000) cart[idx].comboSelected = false;
+
+      refreshSummary();
+      renderCart();
+    });
   });
 
   document.querySelectorAll(".qty").forEach((inp) => {
@@ -344,7 +377,7 @@ function addProductByModel() {
   const existing = cart.find((x) => x.model.toUpperCase() === model);
 
   if (existing) existing.qty += 1;
-  else cart.push({ model: found.model, price: found.price, qty: 1, comboSelected: false });
+  else cart.push({ model: found.model, price: found.price, qty: 1, discountPct: 0, comboSelected: false });
 
   input.value = "";
   document.getElementById("suggestions").style.display = "none";
@@ -598,7 +631,12 @@ function makeOfferText() {
   lines.push("🛒 *Products:*");
 
   cart.forEach((it, i) => {
-    lines.push(`${i + 1}) ${it.model} x${it.qty} = ${formatINR(getItemTotal(it))}`);
+    const offerPrice = getItemOfferPrice(it);
+    const discPct = getItemDiscountPct(it);
+    const discAmt = Number(it.price || 0) - offerPrice;
+    lines.push(
+      `${i + 1}) ${it.model} | MRP ${formatINR(it.price)} | Disc ${discPct}% (${formatINR(discAmt)}) | Offer ${formatINR(offerPrice)} | Qty ${it.qty} | Total ${formatINR(getItemTotal(it))}`
+    );
   });
 
   lines.push("");
