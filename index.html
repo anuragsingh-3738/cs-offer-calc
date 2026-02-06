@@ -1,45 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 <title>HunyHuny Offer Calculator</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <style>
-body{font-family:Arial;margin:0;background:#f5f6fa}
-.container{max-width:1100px;margin:20px auto;padding:16px}
-.card{background:#fff;padding:16px;border-radius:14px;box-shadow:0 3px 10px rgba(0,0,0,.08)}
-.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-.field label{font-size:12px;font-weight:800;margin-bottom:6px;display:block}
-.field input,.field select{width:100%;padding:10px;border-radius:10px;border:1px solid #ddd}
-button{padding:10px 14px;border-radius:10px;border:0;font-weight:800;cursor:pointer}
-.btn-primary{background:#2f6fed;color:#fff}
-.btn-success{background:#16a34a;color:#fff}
-.btn-secondary{background:#eef2ff;color:#1e40af}
-.btn-danger{background:#ffe4e6;color:#9f1239}
+body { font-family: Arial, sans-serif; background:#f5f6fa; margin:0; }
+.container { max-width: 1100px; margin: 20px auto; padding: 16px; }
+.card { background:#fff; padding:16px; border-radius:14px; box-shadow:0 3px 10px rgba(0,0,0,.08); }
 
-.offer-box{margin-top:14px;padding:12px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa}
+.grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+.field label { font-size:12px; font-weight:800; display:block; margin-bottom:6px; }
+.field input, .field select {
+  width:100%; padding:10px; border-radius:10px;
+  border:1px solid #ddd; font-size:14px;
+}
 
-table{width:100%;border-collapse:collapse;margin-top:14px}
-th,td{padding:10px;border-bottom:1px solid #eee;font-size:13px}
-th{background:#fafafa}
+button {
+  padding:10px 14px; border-radius:10px; border:0;
+  font-weight:800; cursor:pointer;
+}
+.btn-primary { background:#2f6fed; color:#fff; }
+.btn-success { background:#16a34a; color:#fff; }
+.btn-secondary { background:#eef2ff; color:#1e40af; }
+.btn-danger { background:#ffe4e6; color:#9f1239; }
+.btn-dark { background:#111827; color:#fff; }
 
-.summary{margin-top:14px;border:1px dashed #ddd;padding:12px;border-radius:12px;background:#fcfcff}
-.row{display:flex;justify-content:space-between;padding:6px 0}
-.hide{display:none}
+.offer-box {
+  margin-top:14px; padding:12px;
+  border-radius:12px; background:#fff7ed;
+  border:1px solid #fed7aa;
+}
 
-.savings{background:#dcfce7;color:#166534;padding:8px 12px;border-radius:14px;font-weight:900}
-.final{background:#111827;color:#fff;padding:14px 18px;border-radius:16px;font-size:26px;font-weight:900}
+table { width:100%; border-collapse:collapse; margin-top:14px; }
+th, td { padding:10px; border-bottom:1px solid #eee; font-size:13px; }
+th { background:#fafafa; }
 
-#offerSlip{margin-top:20px;padding:14px;border-radius:14px;border:1px solid #e5e7eb;background:#fff}
+.qty { width:60px; }
 
-.logo{height:60px;object-fit:contain}
+.summary {
+  margin-top:14px; padding:12px;
+  border:1px dashed #ddd; border-radius:12px;
+  background:#fcfcff;
+}
+.row { display:flex; justify-content:space-between; padding:6px 0; }
+.savings { background:#dcfce7; color:#166534; padding:8px 12px; border-radius:14px; font-weight:900; }
+.final { background:#111827; color:#fff; padding:14px 18px; border-radius:16px; font-size:26px; font-weight:900; }
 
-#upiQR{width:160px;margin-top:10px;display:none}
+.btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
 
-.timer{font-weight:900;color:#7c3aed;text-align:center;margin-top:8px}
+/* Suggestions */
+#suggestions {
+  position:absolute; background:#fff;
+  border:1px solid #ddd; border-radius:10px;
+  max-height:200px; overflow:auto;
+  width:100%; display:none; z-index:999;
+}
+.suggItem {
+  padding:10px; border-bottom:1px solid #eee;
+  cursor:pointer; font-size:13px;
+}
+.suggItem:hover { background:#f3f4f6; }
+
+.relative { position:relative; }
 </style>
 </head>
 
@@ -51,27 +75,28 @@ th{background:#fafafa}
 <div class="grid">
   <div class="field">
     <label>Sales Person Name</label>
-    <input id="salesPerson">
+    <input id="salesPerson" value="Anurag Singh">
   </div>
+
   <div class="field">
     <label>Customer Name</label>
     <input id="customerName">
   </div>
+
   <div class="field">
-    <label>Customer Mobile</label>
+    <label>Customer Mobile Number</label>
     <input id="customerMobile" maxlength="10">
   </div>
 
   <div class="field">
     <label>Payment Mode</label>
-    <select id="paymentMode">
+    <select id="paymentMode" onchange="renderCart()">
       <option value="UPI">UPI</option>
       <option value="NET">Net Banking</option>
     </select>
-    <img src="./HunyHuny QR Code.png" id="upiQR">
   </div>
 
-  <div class="field">
+  <div class="field relative">
     <label>Search Product by Model Number</label>
     <input id="modelInput" placeholder="e.g. HH_BEDCOT-WBBX1">
     <div id="suggestions"></div>
@@ -89,38 +114,37 @@ th{background:#fafafa}
     <input type="checkbox" id="specialEnable" onchange="renderCart()">
     Apply Special Discount
   </label>
-  <input id="specialAmt" type="number" placeholder="Amount" onchange="renderCart()">
-</div>
 
-<!-- CART + SLIP -->
-<div id="offerSlip">
-
-<!-- HEADER -->
-<div style="display:flex;justify-content:space-between;align-items:center">
-  <img src="./logo.png" class="logo">
-  <div>
-    <div><b>Offer ID:</b> <span id="offerId">Not Created</span></div>
-    <div class="timer" id="validity"></div>
+  <div class="grid" style="margin-top:8px">
+    <div class="field">
+      <label>Offer Name</label>
+      <input id="specialName">
+    </div>
+    <div class="field">
+      <label>Offer Amount (₹100–₹1500)</label>
+      <input id="specialAmt" type="number" min="100" max="1500" onchange="renderCart()">
+    </div>
   </div>
 </div>
 
-<!-- CUSTOMER INFO -->
-<div class="grid" style="margin-top:10px">
-  <div><b>Customer:</b> <span id="slipCustomer"></span></div>
-  <div><b>Mobile:</b> <span id="slipMobile"></span></div>
-  <div><b>Sales:</b> <span id="slipSales"></span></div>
+<!-- COMBO DISCOUNT -->
+<div class="offer-box">
+  <label>
+    <input type="checkbox" id="comboEnable" onchange="renderCart()">
+    Apply 3% Combo Discount (Exactly 2 products, each ₹5000+)
+  </label>
 </div>
 
 <!-- TABLE -->
 <table>
 <thead>
 <tr>
-  <th>Combo</th>
-  <th>Model</th>
+  <th>Model No</th>
   <th>MRP</th>
   <th>Discount</th>
   <th>Qty</th>
   <th>Offer Price</th>
+  <th>Action</th>
 </tr>
 </thead>
 <tbody id="cartBody"></tbody>
@@ -128,22 +152,18 @@ th{background:#fafafa}
 
 <!-- SUMMARY -->
 <div class="summary">
-  <div class="row"><span>Offer Base Value</span><b id="orderValue">₹0</b></div>
-
-  <div class="row hide" id="webDiscRow"><span>Website Discount</span><b id="webDiscEl">₹0</b></div>
-  <div class="row hide" id="upiDiscRow"><span>UPI Discount</span><b id="upiDiscEl">₹0</b></div>
-  <div class="row hide" id="comboDiscRow"><span>Combo Discount</span><b id="comboDiscEl">₹0</b></div>
-  <div class="row hide" id="specialDiscRow"><span>Special Discount</span><b id="specialDiscEl">₹0</b></div>
-
+  <div class="row"><span>Order Value</span><b id="orderValue">₹0</b></div>
+  <div class="row"><span>Website Discount</span><b id="webDisc">₹0</b></div>
+  <div class="row"><span>UPI Discount</span><b id="upiDisc">₹0</b></div>
+  <div class="row"><span>Combo Discount</span><b id="comboDisc">₹0</b></div>
+  <div class="row"><span>Special Discount</span><b id="specialDisc">₹0</b></div>
   <div class="row"><span>Total Savings</span><b class="savings" id="totalSavings">₹0</b></div>
-  <div class="row"><span>Final Payable</span><b class="final" id="finalPayEl">₹0</b></div>
+  <div class="row"><span>Final Payable</span><b class="final" id="finalPay">₹0</b></div>
 </div>
 
-</div>
-
-<!-- ACTIONS -->
-<div style="margin-top:16px">
-  <button class="btn-success" onclick="createOffer()">Create Offer</button>
+<!-- BUTTONS -->
+<div class="btns">
+  <button class="btn-success">Create Offer</button>
   <button class="btn-secondary" onclick="clearCart()">Clear Cart</button>
   <button class="btn-danger" onclick="location.reload()">Clear All</button>
 </div>
